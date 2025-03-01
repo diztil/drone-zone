@@ -11,6 +11,8 @@
 #define NUM_DRONES 20
 #define PLAYER_ACCEL 0.1f
 #define FRICTION 0.98f
+#define FPS 60
+#define FRAME_DELAY (1000 / FPS)
 
 typedef struct {
     float x, y, vx, vy;
@@ -207,7 +209,6 @@ void handleMenuEvents(SDL_Event *e) {
 
 // Main loop
 int main() {
-
     SDL_Init(SDL_INIT_VIDEO);
     TTF_Init();
     window = SDL_CreateWindow("Drone Zone", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
@@ -217,7 +218,11 @@ int main() {
     loadHighScore();
     renderMenu();
 
+    Uint32 frameStart; // Variable to track the start of each frame
+
     while (running) {
+        frameStart = SDL_GetTicks(); // Get the current time at the start of the frame
+
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) running = 0;
@@ -232,6 +237,14 @@ int main() {
             updatePlayer(NULL, mouseX, mouseY);
             checkCollisions();
             renderGame();
+        }
+
+        // Calculate how long the frame took
+        Uint32 frameTime = SDL_GetTicks() - frameStart;
+
+        // If the frame took less than the frame delay, delay the remaining time
+        if (frameTime < FRAME_DELAY) {
+            SDL_Delay(FRAME_DELAY - frameTime);
         }
     }
 
