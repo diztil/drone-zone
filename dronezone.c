@@ -23,7 +23,7 @@
 #define ALIGNMENT_FACTOR 0.05
 #define SEPARATION_FACTOR 0.1
 #define SEPARATION_DISTANCE 25
-
+#define MAX_CIRCLES 10
 
 
 typedef struct {
@@ -39,8 +39,20 @@ typedef struct {
     int clicked;
 } Button;
 
+typedef struct {
+    float x, y;
+    int radius;
+    SDL_Color color;
+    int isVisible;
+    int alpha;
+    Uint32 lastAppearanceTime; // For fade-in and fade-out effect
+} Circle;
+
+Uint32 lastCircleSpawnTime = 0;
+
 Drone player;
 Drone drones[NUM_DRONES];
+Circle circles[MAX_CIRCLES];
 
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
@@ -52,6 +64,7 @@ int inHelp = 0;
 int playerHealth = 100;
 int score = 0;
 int highScore = 0;
+int numCircles = 0;
 
 // Menu Buttons
 Button playButton = {{WIDTH / 2 - 50, 200, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
@@ -77,21 +90,65 @@ void saveHighScore() {
     }
 }
 
-// Initialize drones
+// Spawn random circles every 15 seconds
+void spawnCircles() {
+    Uint32 currentTime = SDL_GetTicks();
+
+    if (currentTime - lastCircleSpawnTime > 10000) { // Every 15 seconds
+        lastCircleSpawnTime = currentTime;
+
+        int numNewCircles = rand() % 3 + 1; // 1 to 3 circles
+
+        // Spawn new circles
+        for (int i = 0; i < numNewCircles && numCircles < MAX_CIRCLES; i++) {
+            circles[numCircles].x = rand() % (WIDTH - 20) + 10;  // Random position
+            circles[numCircles].y = rand() % (HEIGHT - 20) + 10;
+            circles[numCircles].radius = 10;
+            circles[numCircles].color = (SDL_Color){0, 255, 255, 255};  // Cyan color
+            circles[numCircles].isVisible = 1;
+            circles[numCircles].alpha = 0; // Start as invisible (fade in)
+            circles[numCircles].lastAppearanceTime = currentTime;
+            numCircles++;
+        }
+    }
+}
+
+// Draw a filled circle
+void SDL_RenderFillCircle(SDL_Renderer *renderer, int x, int y, int radius) {
+    for (int w = 0; w < radius * 2; w++) {
+        for (int h = 0; h < radius * 2; h++) {
+            int dx = radius - w; 
+            int dy = radius - h;
+            if (dx*dx + dy*dy <= radius * radius) {
+                SDL_RenderDrawPoint(renderer, x + dx, y + dy);
+            }
+        }
+    }
+}
+
+
+// Initialize drones and circles
 void initDrones() {
     srand(time(NULL));
     player.x = WIDTH / 2;
     player.y = HEIGHT / 2;
     player.vx = player.vy = 0;
 
-    // Set player health to 100 at the start of the game
-    playerHealth = 100; 
+    // Initialize player attributes
+    playerHealth = 100;
+    score = 0;
 
     for (int i = 0; i < NUM_DRONES; i++) {
         drones[i].x = rand() % WIDTH;
         drones[i].y = rand() % HEIGHT;
         drones[i].vx = (float)(rand() % MAX_SPEED) - MAX_SPEED / 2;
         drones[i].vy = (float)(rand() % MAX_SPEED) - MAX_SPEED / 2;
+    }
+
+    // Initialize circles
+    numCircles = 0;
+    for (int i = 0; i < MAX_CIRCLES; i++) {
+        circles[i].isVisible = 0;  // Initially not visible
     }
 }
 
@@ -299,6 +356,20 @@ void checkCollisions() {
     }
 }
 
+// Check for collisions with circles
+void checkCircleCollisions() {
+    for (int i = 0; i < numCircles; i++) {
+        if (circles[i].isVisible) {
+            float dist = sqrt(pow(player.x - circles[i].x, 2) + pow(player.y - circles[i].y, 2));
+            if (dist < circles[i].radius) {
+                // Player passed over the circle
+                circles[i].isVisible = 0;  // Circle disappears
+                score += 10;  // Increase score
+            }
+        }
+    }
+}
+
 // Render game
 void renderGame() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -326,7 +397,31 @@ void renderGame() {
         healthColor = (SDL_Color){255, 0, 0, 255};  // Red for below 10% health
     }
     
+    // Render circles and handle fade-in/fade-out
+    for (int i = 0; i < numCircles; i++) {
+        if (circles[i].isVisible) {
+            Uint32 currentTime = SDL_GetTicks();
+            // Apply fade-in effect
+            if (circles[i].alpha < 255 && currentTime - circles[i].lastAppearanceTime < 1000) {
+                circles[i].alpha += 5;
+            }
+
+            // Apply fade-out effect after 5 seconds
+            if (currentTime - circles[i].lastAppearanceTime > 5000 && circles[i].alpha > 0) {
+                circles[i].alpha -= 5;
+            }
+
+            // Set the alpha value for the circle color
+            SDL_SetRenderDrawColor(renderer, circles[i].color.r, circles[i].color.g, circles[i].color.b, circles[i].alpha);
+
+            // Draw the circle (using filled circle rendering)
+            SDL_RenderFillCircle(renderer, (int)circles[i].x, (int)circles[i].y, circles[i].radius);
+        }
+    }
+
     updateDrones();
+    spawnCircles();
+    checkCircleCollisions();
 
     // Set the health bar color and render it
     SDL_SetRenderDrawColor(renderer, healthColor.r, healthColor.g, healthColor.b, healthColor.a);
@@ -349,7 +444,6 @@ void renderGame() {
 
     SDL_RenderPresent(renderer);
 }
-
 
 
 // Render menu buttons
@@ -381,10 +475,10 @@ void renderHelp() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    renderText("DRONE ZONE © Dewan Mukto, MuxAI 2025", WIDTH / 2 - 150, 50, (SDL_Color){255, 255, 255, 255});
-    renderText("dewanmukto.mux8.com", WIDTH / 2 - 100, 100, (SDL_Color){255, 255, 255, 255});
-    renderText("Use your mouse for moving your drone.", WIDTH / 2 - 170, 150, (SDL_Color){255, 255, 255, 255});
-    renderText("Avoid crashing into other peoples' drones!", WIDTH / 2 - 170, 200, (SDL_Color){255, 255, 255, 255});
+    renderText("DRONE ZONE (c) Dewan Mukto, MuxAI 2025", WIDTH / 2 - 220, 50, (SDL_Color){255, 255, 255, 255});
+    renderText("dewanmukto.mux8.com", WIDTH / 2 - 100, 100, (SDL_Color){255, 255, 255, 55});
+    renderText("Use your mouse for moving your drone.", WIDTH / 2 - 220, 150, (SDL_Color){255, 255, 255, 255});
+    renderText("Avoid crashing into other peoples' drones!", WIDTH / 2 - 220, 200, (SDL_Color){255, 255, 255, 255});
 
     // Render the Back button
     renderButton(&backButton, "Back");
