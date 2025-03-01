@@ -9,7 +9,7 @@
 #define HEIGHT 600
 #define MAX_SPEED 4
 #define NUM_DRONES 50
-#define PLAYER_ACCEL 0.1f
+#define PLAYER_ACCEL 0.5f
 #define FRICTION 0.98f
 #define FPS 60
 #define FRAME_DELAY (1000 / FPS)
@@ -48,6 +48,7 @@ TTF_Font *font = NULL;
 
 int running = 1;
 int inGame = 0;
+int inHelp = 0;
 int playerHealth = 100;
 int score = 0;
 int highScore = 0;
@@ -55,6 +56,7 @@ int highScore = 0;
 // Menu Buttons
 Button playButton = {{WIDTH / 2 - 50, 200, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
 Button helpButton = {{WIDTH / 2 - 50, 250, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
+Button backButton = {{10, HEIGHT - 50, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
 Button exitButton = {{WIDTH / 2 - 50, 300, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
 
 // Load high score from file
@@ -374,7 +376,24 @@ void renderMenu() {
     SDL_RenderPresent(renderer);
 }
 
-// Handle menu events
+// Render the Help screen
+void renderHelp() {
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    renderText("DRONE ZONE © Dewan Mukto, MuxAI 2025", WIDTH / 2 - 150, 50, (SDL_Color){255, 255, 255, 255});
+    renderText("dewanmukto.mux8.com", WIDTH / 2 - 100, 100, (SDL_Color){255, 255, 255, 255});
+    renderText("Use your mouse for moving your drone.", WIDTH / 2 - 170, 150, (SDL_Color){255, 255, 255, 255});
+    renderText("Avoid crashing into other peoples' drones!", WIDTH / 2 - 170, 200, (SDL_Color){255, 255, 255, 255});
+
+    // Render the Back button
+    renderButton(&backButton, "Back");
+
+    SDL_RenderPresent(renderer);
+}
+
+
+// Modify handleMenuEvents
 void handleMenuEvents(SDL_Event *e) {
     int x, y;
     SDL_GetMouseState(&x, &y);
@@ -392,10 +411,26 @@ void handleMenuEvents(SDL_Event *e) {
             button->clicked = 0;
             if (button == &playButton) {
                 inGame = 1;
+                inHelp = 0;  // Ensure we're not in help mode
                 initDrones();
             } else if (button == &exitButton) {
                 running = 0;
+            } else if (button == &helpButton) {
+                inHelp = 1;  // Switch to the help screen
+                inGame = 0;  // Ensure we're not in the game mode
             }
+        }
+    }
+
+    // Handle the back button on the help screen
+    if (inHelp) {
+        backButton.hovered = (x >= backButton.rect.x && x <= backButton.rect.x + backButton.rect.w &&
+                              y >= backButton.rect.y && y <= backButton.rect.y + backButton.rect.h);
+        if (e->type == SDL_MOUSEBUTTONDOWN && backButton.hovered) {
+            backButton.clicked = 1;
+        } else if (e->type == SDL_MOUSEBUTTONUP && backButton.clicked) {
+            backButton.clicked = 0;
+            inHelp = 0;  // Go back to the main menu
         }
     }
 }
@@ -425,11 +460,14 @@ int main() {
         int mouseX, mouseY;
         SDL_GetMouseState(&mouseX, &mouseY);
 
-        if (!inGame) renderMenu();
-        else {
+        if (inHelp) {
+            renderHelp(); // Show help screen
+        } else if (!inGame) {
+            renderMenu(); // Show menu
+        } else {
             updatePlayer(NULL, mouseX, mouseY);
             checkCollisions();
-            renderGame();
+            renderGame(); // Show game screen
         }
 
         // Calculate how long the frame took
