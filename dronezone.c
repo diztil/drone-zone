@@ -734,7 +734,7 @@ void handleMenuEvents(SDL_Event *e) {
 }
 
 // Main loop
-int main() {
+int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     TTF_Init();
     window = SDL_CreateWindow("Drone Zone", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
