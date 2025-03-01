@@ -16,9 +16,9 @@
 #define SEPARATION_RADIUS 50.0f
 #define ALIGNMENT_RADIUS 100.0f
 #define COHESION_RADIUS 100.0f
-#define SEPARATION_WEIGHT 1.5f
-#define ALIGNMENT_WEIGHT 1.0f
-#define COHESION_WEIGHT 1.0f
+#define SEPARATION_WEIGHT 0.5f
+#define ALIGNMENT_WEIGHT 0.5f
+#define COHESION_WEIGHT 0.5f
 
 typedef struct {
     float x, y, vx, vy;
@@ -196,6 +196,13 @@ void updateDrones() {
         drones[i].vx *= FRICTION;
         drones[i].vy *= FRICTION;
 
+        // Limit drone velocity to prevent them from moving too fast
+        float speed = sqrt(drones[i].vx * drones[i].vx + drones[i].vy * drones[i].vy);
+        if (speed > MAX_SPEED) {
+            drones[i].vx = (drones[i].vx / speed) * MAX_SPEED;
+            drones[i].vy = (drones[i].vy / speed) * MAX_SPEED;
+        }
+
         // Update drone position
         drones[i].x += drones[i].vx;
         drones[i].y += drones[i].vy;
@@ -207,7 +214,6 @@ void updateDrones() {
         if (drones[i].y >= HEIGHT) drones[i].y = 0;
     }
 }
-
 
 // Update player movement (mouse-based)
 void updatePlayer(const Uint8 *keystate, int mouseX, int mouseY) {
