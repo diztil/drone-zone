@@ -1,9 +1,9 @@
-# drone-zone
+# drone-zone 🐝
 Experimenting with game development using the dinosaur of programming languages, i.e. C.
 
 ### Compilation
 ```bash
-gcc -o dronezone dronezone.c -lm $(sdl2-config --cflags --libs) $(pkg-config --cflags --libs SDL2_ttf)
+gcc -o dronezone dronezone.c -lm $(sdl2-config --cflags --libs) $(pkg-config --cflags --libs SDL2_ttf SDL2_gfx)
 ```
 
 ### Launching
@@ -22,8 +22,10 @@ gcc -o dronezone dronezone.c -lm $(sdl2-config --cflags --libs) $(pkg-config --c
 - [x] GUI implementation
 - [x] GUI buttons with hover effects
 - [x] GUI fonts
-- [ ] Keyboard controls
-- [ ] GUI health bar
-- [ ] GUI score board
-- [ ] File I/O for saving/retrieving high scores
-- [ ] Boids algorithm for drone simulation    
+- [x] Mouse controls
+- [x] GUI health bar
+- [x] GUI score board
+- [x] Multiple GUI screens
+- [x] File I/O for saving/retrieving high scores
+- [x] Boids algorithm for drone simulation
+- [x] Hardcoded bee models   
