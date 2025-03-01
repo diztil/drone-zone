@@ -8,17 +8,23 @@
 #define WIDTH 800
 #define HEIGHT 600
 #define MAX_SPEED 4
-#define NUM_DRONES 20
+#define NUM_DRONES 50
 #define PLAYER_ACCEL 0.1f
 #define FRICTION 0.98f
 #define FPS 60
 #define FRAME_DELAY (1000 / FPS)
-#define SEPARATION_RADIUS 50.0f
+#define SEPARATION_RADIUS 25.0f
 #define ALIGNMENT_RADIUS 100.0f
 #define COHESION_RADIUS 100.0f
-#define SEPARATION_WEIGHT 0.5f
-#define ALIGNMENT_WEIGHT 0.5f
-#define COHESION_WEIGHT 0.5f
+#define COHESION_WEIGHT 0.01f
+#define ALIGNMENT_WEIGHT 0.05f
+#define SEPARATION_WEIGHT 0.1f
+#define COHESION_FACTOR 0.01
+#define ALIGNMENT_FACTOR 0.05
+#define SEPARATION_FACTOR 0.1
+#define SEPARATION_DISTANCE 25
+
+
 
 typedef struct {
     float x, y, vx, vy;
@@ -184,30 +190,63 @@ void renderText(const char *text, int x, int y, SDL_Color color) {
 // Update drones based on Boid behavior
 void updateDrones() {
     for (int i = 0; i < NUM_DRONES; i++) {
-        SDL_Point sep = separation(&drones[i]);
-        SDL_Point ali = alignment(&drones[i]);
-        SDL_Point coh = cohesion(&drones[i]);
+        float avg_vx = 0, avg_vy = 0;
+        float avg_x = 0, avg_y = 0;
+        float separation_x = 0, separation_y = 0;
+        int neighbors = 0;
 
-        // Apply the weights to each force
-        drones[i].vx += sep.x * SEPARATION_WEIGHT + ali.x * ALIGNMENT_WEIGHT + coh.x * COHESION_WEIGHT;
-        drones[i].vy += sep.y * SEPARATION_WEIGHT + ali.y * ALIGNMENT_WEIGHT + coh.y * COHESION_WEIGHT;
+        for (int j = 0; j < NUM_DRONES; j++) {
+            if (i == j) continue;
+            float dx = drones[i].x - drones[j].x;
+            float dy = drones[i].y - drones[j].y;
+            float distance = sqrt(dx * dx + dy * dy);
 
-        // Apply some friction to reduce speed over time
-        drones[i].vx *= FRICTION;
-        drones[i].vy *= FRICTION;
+            // Always include every other drone for cohesion and alignment:
+            avg_x += drones[j].x;
+            avg_y += drones[j].y;
+            avg_vx += drones[j].vx;
+            avg_vy += drones[j].vy;
 
-        // Limit drone velocity to prevent them from moving too fast
+            // Separation: only for drones closer than SEPARATION_RADIUS (now 25.0f)
+            if (distance < SEPARATION_RADIUS) {
+                separation_x += (drones[i].x - drones[j].x);
+                separation_y += (drones[i].y - drones[j].y);
+            }
+
+            neighbors++;
+        }
+
+        if (neighbors > 0) {
+            avg_x /= neighbors;
+            avg_y /= neighbors;
+            avg_vx /= neighbors;
+            avg_vy /= neighbors;
+
+            // Apply the forces with the new weights:
+            drones[i].vx += (avg_x - drones[i].x) * COHESION_WEIGHT;
+            drones[i].vy += (avg_y - drones[i].y) * COHESION_WEIGHT;
+
+            drones[i].vx += avg_vx * ALIGNMENT_WEIGHT;
+            drones[i].vy += avg_vy * ALIGNMENT_WEIGHT;
+
+            drones[i].vx += separation_x * SEPARATION_WEIGHT;
+            drones[i].vy += separation_y * SEPARATION_WEIGHT;
+        }
+
+        // (Optional) Remove friction to match reference exactly:
+        // drones[i].vx *= FRICTION;
+        // drones[i].vy *= FRICTION;
+
+        // Limit the velocity
         float speed = sqrt(drones[i].vx * drones[i].vx + drones[i].vy * drones[i].vy);
         if (speed > MAX_SPEED) {
             drones[i].vx = (drones[i].vx / speed) * MAX_SPEED;
             drones[i].vy = (drones[i].vy / speed) * MAX_SPEED;
         }
 
-        // Update drone position
+        // Update position and wrap around
         drones[i].x += drones[i].vx;
         drones[i].y += drones[i].vy;
-
-        // Prevent drones from going out of bounds (wrap around screen)
         if (drones[i].x < 0) drones[i].x = WIDTH;
         if (drones[i].x >= WIDTH) drones[i].x = 0;
         if (drones[i].y < 0) drones[i].y = HEIGHT;
