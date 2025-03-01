@@ -29,8 +29,7 @@
 
 
 typedef struct {
-    float x, y, vx, vy;
-} Drone;
+    float x, y, vx, vy;} Drone;
 
 typedef struct {
     SDL_Rect rect;
@@ -38,8 +37,7 @@ typedef struct {
     SDL_Color hoverColor;
     SDL_Color clickColor;
     int hovered;
-    int clicked;
-} Button;
+    int clicked;} Button;
 
 typedef struct {
     float x, y;
@@ -47,8 +45,8 @@ typedef struct {
     SDL_Color color;
     int isVisible;
     int alpha;
-    Uint32 lastAppearanceTime; // For fade-in and fade-out effect
-} Circle;
+    int isBloomed;
+    Uint32 lastAppearanceTime;} Flower;
 
 typedef struct {
     float x, y;          // Position of the plant base
@@ -60,23 +58,15 @@ typedef struct {
     int type;            // 0 = Grass, 1 = Vine, 2 = Fern
     int alpha;
     int isVisible;
-    int height;
-} Plant;
-
-typedef struct {
-    int x, y;
-    SDL_Color color;
-    int isBloomed;
-} Flower;
+    int height;} Plant;
 
 
 Uint32 lastCircleSpawnTime = 0;
 
 Drone player;
 Drone drones[NUM_DRONES];
-Circle circles[MAX_CIRCLES];
-Plant plants[MAX_PLANTS];
 Flower flowers[MAX_CIRCLES];
+Plant plants[MAX_PLANTS];
 
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
@@ -89,7 +79,7 @@ int gameOver = 0;
 int playerHealth = 100;
 int score = 0;
 int highScore = 0;
-int numCircles = 0;
+int numFlowers = 0;
 int numPlants = 0;
 int grayProgress = 0;
 
@@ -100,7 +90,6 @@ SDL_Color honeyHighlight = {255, 204, 102, 255}; // Lighter honey
 SDL_Color honeyShadow = {200, 140, 0, 255};     // Darker brown
 SDL_Color beeStripe = {50, 30, 0, 255};        // Dark brown for stripes
 SDL_Color beeFace = {0, 0, 0, 255};            // Black for eyes/mouth
-
 
 // Menu Buttons
 Button playButton = {{WIDTH / 2 - 50, 200, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
@@ -177,7 +166,6 @@ void spawnPlants() {
     numPlants++;
 }
 
-
 void updatePlants() {
     for (int i = 0; i < MAX_PLANTS; i++) {
         if (!plants[i].isVisible) continue;
@@ -241,33 +229,7 @@ void renderPlants() {
     }
 }
 
-void spawnFlower(int x, int y) {
-    if (numCircles < MAX_CIRCLES) {
-        flowers[numCircles].x = x;
-        flowers[numCircles].y = y;
-        flowers[numCircles].color = (SDL_Color){rand() % 256, rand() % 256, rand() % 256, 255};
-        flowers[numCircles].isBloomed = 0;
-        numCircles++;
-    }
-}
-
-void updateFlowers() {
-    for (int i = 0; i < numCircles; i++) {
-        if (!flowers[i].isBloomed) {
-            // Simulate blooming logic
-            flowers[i].isBloomed = 1;
-        }
-    }
-}
-
-void renderFlowers(SDL_Renderer* renderer) {
-    for (int i = 0; i < numCircles; i++) {
-        filledCircleRGBA(renderer, flowers[i].x, flowers[i].y, 5, 
-                         flowers[i].color.r, flowers[i].color.g, flowers[i].color.b, 255);
-    }
-}
-
-void spawnCircles() {
+void spawnFlowers() {
     Uint32 currentTime = SDL_GetTicks();
 
     if (currentTime - lastCircleSpawnTime > 10000) { // Every 10 seconds
@@ -275,8 +237,8 @@ void spawnCircles() {
 
         int numNewCircles = rand() % 3 + 1; // 1 to 3 circles
 
-        if (numCircles + numNewCircles > MAX_CIRCLES) {
-            numNewCircles = MAX_CIRCLES - numCircles;
+        if (numFlowers + numNewCircles > MAX_CIRCLES) {
+            numNewCircles = MAX_CIRCLES - numFlowers;
         }
 
         for (int i = 0; i < numNewCircles; i++) {
@@ -296,7 +258,7 @@ void spawnCircles() {
             while (budRadius < 10) {
                 filledCircleRGBA(renderer, x, y, budRadius, 34, 139, 34, 255);
                 SDL_RenderPresent(renderer);
-                SDL_Delay(30);
+                SDL_Delay(10);
                 budRadius++;
             }
             
@@ -307,22 +269,21 @@ void spawnCircles() {
                 int petalY = y + sin(p * M_PI / 180) * 12;
                 filledEllipseRGBA(renderer, petalX, petalY, rand() % 8 + 5, rand() % 6 + 4, petalColor.r, petalColor.g, petalColor.b, 255);
                 SDL_RenderPresent(renderer);
-                SDL_Delay(50);
+                SDL_Delay(10);
             }
             
             // Assign final bloom properties
-            circles[numCircles].x = x;
-            circles[numCircles].y = y;
-            circles[numCircles].radius = 10;
-            circles[numCircles].color = (SDL_Color){rand() % 100 + 100, rand() % 80 + 60, rand() % 60 + 40, 255}; // Earthy tones
-            circles[numCircles].isVisible = 1;
-            circles[numCircles].alpha = 255;
-            circles[numCircles].lastAppearanceTime = currentTime;
-            numCircles++;
+            flowers[numFlowers].x = x;
+            flowers[numFlowers].y = y;
+            flowers[numFlowers].radius = 10;
+            flowers[numFlowers].color = (SDL_Color){rand() % 100 + 100, rand() % 80 + 60, rand() % 60 + 40, 255}; // Earthy tones
+            flowers[numFlowers].isVisible = 1;
+            flowers[numFlowers].alpha = 255;
+            flowers[numFlowers].lastAppearanceTime = currentTime;
+            numFlowers++;
         }
     }
 }
-
 
 // Draw a filled circle
 void SDL_RenderFillCircle(SDL_Renderer *renderer, int x, int y, int radius) {
@@ -335,6 +296,7 @@ void SDL_RenderFillCircle(SDL_Renderer *renderer, int x, int y, int radius) {
             }
         }
     }
+    // This game is a work of Dewan Mukto, DO NOT STEAL
 }
 
 // Function to draw a bee (player or drone)
@@ -387,95 +349,11 @@ void initDrones() {
     }
 
     // Initialize circles
-    numCircles = 0;
+    numFlowers = 0;
     for (int i = 0; i < MAX_CIRCLES; i++) {
-        circles[i].isVisible = 0;  // Initially not visible
+        flowers[i].isVisible = 0;  // Initially not visible
     }
 }
-
-// Calculate the separation force (avoid crowding neighbors)
-SDL_Point separation(Drone *drone) {
-    SDL_Point force = {0, 0};
-    int count = 0;
-
-    for (int i = 0; i < NUM_DRONES; i++) {
-        if (&drones[i] != drone) {
-            float dx = drone->x - drones[i].x;
-            float dy = drone->y - drones[i].y;
-            float distance = sqrt(dx * dx + dy * dy);
-
-            if (distance < SEPARATION_RADIUS) {
-                force.x += dx / distance;
-                force.y += dy / distance;
-                count++;
-            }
-        }
-    }
-
-    if (count > 0) {
-        force.x /= count;
-        force.y /= count;
-    }
-
-    return force;
-}
-
-// Calculate the alignment force (match the velocity of nearby drones)
-SDL_Point alignment(Drone *drone) {
-    SDL_Point force = {0, 0};
-    int count = 0;
-
-    for (int i = 0; i < NUM_DRONES; i++) {
-        if (&drones[i] != drone) {
-            float dx = drone->x - drones[i].x;
-            float dy = drone->y - drones[i].y;
-            float distance = sqrt(dx * dx + dy * dy);
-
-            if (distance < ALIGNMENT_RADIUS) {
-                force.x += drones[i].vx;
-                force.y += drones[i].vy;
-                count++;
-            }
-        }
-    }
-
-    if (count > 0) {
-        force.x /= count;
-        force.y /= count;
-    }
-
-    return force;
-}
-
-// Calculate the cohesion force (move towards the average position of nearby drones)
-SDL_Point cohesion(Drone *drone) {
-    SDL_Point force = {0, 0};
-    int count = 0;
-
-    for (int i = 0; i < NUM_DRONES; i++) {
-        if (&drones[i] != drone) {
-            float dx = drone->x - drones[i].x;
-            float dy = drone->y - drones[i].y;
-            float distance = sqrt(dx * dx + dy * dy);
-
-            if (distance < COHESION_RADIUS) {
-                force.x += drones[i].x;
-                force.y += drones[i].y;
-                count++;
-            }
-        }
-    }
-
-    if (count > 0) {
-        force.x /= count;
-        force.y /= count;
-        force.x -= drone->x;
-        force.y -= drone->y;
-    }
-
-    return force;
-}
-
 
 // Render text on screen
 void renderText(const char *text, int x, int y, SDL_Color color) {
@@ -613,21 +491,16 @@ void checkCollisions() {
 }
 
 void checkCircleCollisions() {
-    for (int i = 0; i < numCircles; i++) {
-        if (circles[i].isVisible) {
-            float dist = sqrt(pow(player.x - circles[i].x, 2) + pow(player.y - circles[i].y, 2));
-            if (dist < circles[i].radius) {
-                // Player passed over the circle
-                circles[i].isVisible = 0;  // Circle disappears
-                score += 10;  // Increase score
-
-                // Remove the circle by shifting remaining circles down
-                for (int j = i; j < numCircles - 1; j++) {
-                    circles[j] = circles[j + 1];  // Move each circle down one slot
-                }
-                numCircles--;  // Decrease the number of active circles
-                i--;  // Adjust index to avoid skipping a circle
-            }
+    Uint32 currentTime = SDL_GetTicks();
+    for (int i = 0; i < numFlowers; i++) {
+        // Check for player collection (example: if player is near)
+        int dx = player.x - flowers[i].x;
+        int dy = player.y - flowers[i].y;
+        if (sqrt(dx * dx + dy * dy) < 15) {  // Example: if within 15px
+            score += 10;  // Increase score
+            flowers[i] = flowers[numFlowers - 1];  // Remove flower
+            numFlowers--;
+            i--;
         }
     }
 }
@@ -636,6 +509,7 @@ void checkCircleCollisions() {
 void renderGame() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
+    Uint32 currentTime = SDL_GetTicks();
 
     renderBackground();
 
@@ -665,30 +539,15 @@ void renderGame() {
         healthColor = (SDL_Color){255, 0, 0, 255};  // Red for below 10% health
     }
     
-    // Render circles and handle fade-in/fade-out
-    for (int i = 0; i < numCircles; i++) {
-        if (circles[i].isVisible) {
-            Uint32 currentTime = SDL_GetTicks();
-            // Apply fade-in effect
-            if (circles[i].alpha < 255 && currentTime - circles[i].lastAppearanceTime < 1000) {
-                circles[i].alpha += 5;
-            }
-
-            // Apply fade-out effect after 5 seconds
-            if (currentTime - circles[i].lastAppearanceTime > 5000 && circles[i].alpha > 0) {
-                circles[i].alpha -= 5;
-            }
-
-            // Set the alpha value for the circle color
-            SDL_SetRenderDrawColor(renderer, circles[i].color.r, circles[i].color.g, circles[i].color.b, circles[i].alpha);
-
-            // Draw the circle (using filled circle rendering)
-            SDL_RenderFillCircle(renderer, (int)circles[i].x, (int)circles[i].y, circles[i].radius);
-        }
+    // Render circles/flowers and handle fade-in/fade-out
+    for (int i = 0; i < numFlowers; i++) {
+        // Always render with full opacity (flowers remain persistent)
+        SDL_SetRenderDrawColor(renderer, flowers[i].color.r, flowers[i].color.g, flowers[i].color.b, 255);
+        SDL_RenderFillCircle(renderer, flowers[i].x, flowers[i].y, flowers[i].radius);
     }
 
     updateDrones();
-    spawnCircles();
+    spawnFlowers();
     checkCircleCollisions();
 
     // Set the health bar color and render it
@@ -713,7 +572,6 @@ void renderGame() {
     SDL_RenderPresent(renderer);
     
 }
-
 
 // Render menu buttons
 void renderButton(Button *button, const char *text) {
@@ -786,7 +644,6 @@ void renderGameOver() {
     SDL_RenderPresent(renderer);
 }
 
-
 void handleGameOverEvents(SDL_Event *e) {
     int x, y;
     SDL_GetMouseState(&x, &y);
@@ -810,7 +667,7 @@ void handleGameOverEvents(SDL_Event *e) {
         playerHealth = 100;
         score = 0;
         initDrones();
-        numCircles = 0;
+        numFlowers = 0;
         // Reset gray progress for a fresh transition next time
         // (Either reinitialize grayProgress here or in initDrones())
     }
@@ -824,11 +681,10 @@ void handleGameOverEvents(SDL_Event *e) {
         gameOver = 0;   // Clear game over flag
         // Optionally, reset other game state if needed:
         initDrones();
-        numCircles = 0;
+        numFlowers = 0;
         grayProgress = 0;
     }
 }
-
 
 // Modify handleMenuEvents
 void handleMenuEvents(SDL_Event *e) {
