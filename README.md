@@ -8,8 +8,24 @@ sudo apt install build-essential libsdl2-dev libsdl2-ttf-dev libsdl2-gfx-dev lib
 As of now, the program needs `Sigmar-Regular.ttf` to be present in the same directory (otherwise weird errors would occur). Be sure to download it from the repository code & files above.
 
 ### Compilation
+##### Linux 🐧
 ```bash
 gcc -o dronezone dronezone.c -lm $(sdl2-config --cflags --libs) $(pkg-config --cflags --libs SDL2_ttf SDL2_gfx)
+```
+as simple as that!
+##### Windows 🪟
+```powershell
+gcc -o dronezone dronezone.c $(sdl2-config --cflags) -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_gfx -lm
+```
+via `MSYS2`, after installing the necessary libraries, i.e.:
+```bash
+pacman -S mingw-w64-x86_64-gcc
+pacman -S mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_ttf mingw-w64-x86_64-SDL2_gfx
+```
+and then make sure to add these to `PATH` via System Environment Variables:
+```
+C:\mingw-w64\bin
+C:\msys64\mingw64\bin
 ```
 
 ### Launching
