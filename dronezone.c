@@ -86,15 +86,28 @@ void renderText(const char *text, int x, int y, SDL_Color color) {
     SDL_DestroyTexture(texture);
 }
 
-// Update player movement
-void updatePlayer(const Uint8 *keystate) {
-    if (keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_UP]) player.vy -= PLAYER_ACCEL;
-    if (keystate[SDL_SCANCODE_S] || keystate[SDL_SCANCODE_DOWN]) player.vy += PLAYER_ACCEL;
-    if (keystate[SDL_SCANCODE_A] || keystate[SDL_SCANCODE_LEFT]) player.vx -= PLAYER_ACCEL;
-    if (keystate[SDL_SCANCODE_D] || keystate[SDL_SCANCODE_RIGHT]) player.vx += PLAYER_ACCEL;
+// Update player movement (mouse-based)
+void updatePlayer(const Uint8 *keystate, int mouseX, int mouseY) {
+    // Calculate direction vector toward the mouse
+    float dx = mouseX - player.x;
+    float dy = mouseY - player.y;
 
+    // Normalize the vector
+    float distance = sqrt(dx * dx + dy * dy);
+    if (distance > 0) {
+        dx /= distance;
+        dy /= distance;
+    }
+
+    // Move player towards the mouse position
+    player.vx += dx * PLAYER_ACCEL;
+    player.vy += dy * PLAYER_ACCEL;
+
+    // Apply friction
     player.vx *= FRICTION;
     player.vy *= FRICTION;
+
+    // Update player position
     player.x += player.vx;
     player.y += player.vy;
 }
@@ -194,6 +207,7 @@ void handleMenuEvents(SDL_Event *e) {
 
 // Main loop
 int main() {
+
     SDL_Init(SDL_INIT_VIDEO);
     TTF_Init();
     window = SDL_CreateWindow("Drone Zone", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
@@ -209,8 +223,16 @@ int main() {
             if (e.type == SDL_QUIT) running = 0;
             handleMenuEvents(&e);
         }
+
+        int mouseX, mouseY;
+        SDL_GetMouseState(&mouseX, &mouseY);
+
         if (!inGame) renderMenu();
-        else renderGame();
+        else {
+            updatePlayer(NULL, mouseX, mouseY);
+            checkCollisions();
+            renderGame();
+        }
     }
 
     SDL_DestroyRenderer(renderer);
