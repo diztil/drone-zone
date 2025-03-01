@@ -70,6 +70,9 @@ void initDrones() {
     player.y = HEIGHT / 2;
     player.vx = player.vy = 0;
 
+    // Set player health to 100 at the start of the game
+    playerHealth = 100; 
+
     for (int i = 0; i < NUM_DRONES; i++) {
         drones[i].x = rand() % WIDTH;
         drones[i].y = rand() % HEIGHT;
@@ -146,16 +149,41 @@ void renderGame() {
     SDL_Rect p = {(int)player.x, (int)player.y, 8, 8};
     SDL_RenderFillRect(renderer, &p);
 
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_Rect healthBar = {10, 10, playerHealth * 2, 20};
+    // Determine the health bar color based on the health value
+    SDL_Color healthColor;
+    if (playerHealth >= 60) {
+        healthColor = (SDL_Color){0, 255, 0, 255};  // Green for 60-100% health
+    } else if (playerHealth >= 30) {
+        healthColor = (SDL_Color){255, 255, 0, 255};  // Yellow for 30-59% health
+    } else if (playerHealth >= 10) {
+        healthColor = (SDL_Color){255, 165, 0, 255};  // Orange for 10-29% health
+    } else {
+        healthColor = (SDL_Color){255, 0, 0, 255};  // Red for below 10% health
+    }
+
+    // Set the health bar color and render it
+    SDL_SetRenderDrawColor(renderer, healthColor.r, healthColor.g, healthColor.b, healthColor.a);
+    SDL_Rect healthBar = {10, 10, playerHealth * 2, 20};  // Health bar width depends on health value
     SDL_RenderFillRect(renderer, &healthBar);
 
+    // Render the numeric value of health at the center of the health bar
+    char healthText[50];
+    sprintf(healthText, "%d", playerHealth);  // Convert health to string with 2 decimal places
+    int healthTextWidth, healthTextHeight;
+    TTF_SizeText(font, healthText, &healthTextWidth, &healthTextHeight);
+
+    // Render health in the middle of the health bar
+    renderText(healthText, 10 + (playerHealth * 2 - healthTextWidth) / 2, 10 + (20 - healthTextHeight) / 2, (SDL_Color){0, 0, 0, 255});
+
+    // Render score
     char scoreText[50];
     sprintf(scoreText, "Score: %d", score);
     renderText(scoreText, WIDTH - 150, 10, (SDL_Color){255, 255, 255, 255});
 
     SDL_RenderPresent(renderer);
 }
+
+
 
 // Render menu buttons
 void renderButton(Button *button, const char *text) {
