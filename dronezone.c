@@ -13,6 +13,12 @@
 #define FRICTION 0.98f
 #define FPS 60
 #define FRAME_DELAY (1000 / FPS)
+#define SEPARATION_RADIUS 50.0f
+#define ALIGNMENT_RADIUS 100.0f
+#define COHESION_RADIUS 100.0f
+#define SEPARATION_WEIGHT 1.5f
+#define ALIGNMENT_WEIGHT 1.0f
+#define COHESION_WEIGHT 1.0f
 
 typedef struct {
     float x, y, vx, vy;
@@ -81,6 +87,90 @@ void initDrones() {
     }
 }
 
+// Calculate the separation force (avoid crowding neighbors)
+SDL_Point separation(Drone *drone) {
+    SDL_Point force = {0, 0};
+    int count = 0;
+
+    for (int i = 0; i < NUM_DRONES; i++) {
+        if (&drones[i] != drone) {
+            float dx = drone->x - drones[i].x;
+            float dy = drone->y - drones[i].y;
+            float distance = sqrt(dx * dx + dy * dy);
+
+            if (distance < SEPARATION_RADIUS) {
+                force.x += dx / distance;
+                force.y += dy / distance;
+                count++;
+            }
+        }
+    }
+
+    if (count > 0) {
+        force.x /= count;
+        force.y /= count;
+    }
+
+    return force;
+}
+
+// Calculate the alignment force (match the velocity of nearby drones)
+SDL_Point alignment(Drone *drone) {
+    SDL_Point force = {0, 0};
+    int count = 0;
+
+    for (int i = 0; i < NUM_DRONES; i++) {
+        if (&drones[i] != drone) {
+            float dx = drone->x - drones[i].x;
+            float dy = drone->y - drones[i].y;
+            float distance = sqrt(dx * dx + dy * dy);
+
+            if (distance < ALIGNMENT_RADIUS) {
+                force.x += drones[i].vx;
+                force.y += drones[i].vy;
+                count++;
+            }
+        }
+    }
+
+    if (count > 0) {
+        force.x /= count;
+        force.y /= count;
+    }
+
+    return force;
+}
+
+// Calculate the cohesion force (move towards the average position of nearby drones)
+SDL_Point cohesion(Drone *drone) {
+    SDL_Point force = {0, 0};
+    int count = 0;
+
+    for (int i = 0; i < NUM_DRONES; i++) {
+        if (&drones[i] != drone) {
+            float dx = drone->x - drones[i].x;
+            float dy = drone->y - drones[i].y;
+            float distance = sqrt(dx * dx + dy * dy);
+
+            if (distance < COHESION_RADIUS) {
+                force.x += drones[i].x;
+                force.y += drones[i].y;
+                count++;
+            }
+        }
+    }
+
+    if (count > 0) {
+        force.x /= count;
+        force.y /= count;
+        force.x -= drone->x;
+        force.y -= drone->y;
+    }
+
+    return force;
+}
+
+
 // Render text on screen
 void renderText(const char *text, int x, int y, SDL_Color color) {
     SDL_Surface *surface = TTF_RenderText_Solid(font, text, color);
@@ -90,6 +180,34 @@ void renderText(const char *text, int x, int y, SDL_Color color) {
     SDL_FreeSurface(surface);
     SDL_DestroyTexture(texture);
 }
+
+// Update drones based on Boid behavior
+void updateDrones() {
+    for (int i = 0; i < NUM_DRONES; i++) {
+        SDL_Point sep = separation(&drones[i]);
+        SDL_Point ali = alignment(&drones[i]);
+        SDL_Point coh = cohesion(&drones[i]);
+
+        // Apply the weights to each force
+        drones[i].vx += sep.x * SEPARATION_WEIGHT + ali.x * ALIGNMENT_WEIGHT + coh.x * COHESION_WEIGHT;
+        drones[i].vy += sep.y * SEPARATION_WEIGHT + ali.y * ALIGNMENT_WEIGHT + coh.y * COHESION_WEIGHT;
+
+        // Apply some friction to reduce speed over time
+        drones[i].vx *= FRICTION;
+        drones[i].vy *= FRICTION;
+
+        // Update drone position
+        drones[i].x += drones[i].vx;
+        drones[i].y += drones[i].vy;
+
+        // Prevent drones from going out of bounds (wrap around screen)
+        if (drones[i].x < 0) drones[i].x = WIDTH;
+        if (drones[i].x >= WIDTH) drones[i].x = 0;
+        if (drones[i].y < 0) drones[i].y = HEIGHT;
+        if (drones[i].y >= HEIGHT) drones[i].y = 0;
+    }
+}
+
 
 // Update player movement (mouse-based)
 void updatePlayer(const Uint8 *keystate, int mouseX, int mouseY) {
@@ -160,6 +278,8 @@ void renderGame() {
     } else {
         healthColor = (SDL_Color){255, 0, 0, 255};  // Red for below 10% health
     }
+    
+    updateDrones();
 
     // Set the health bar color and render it
     SDL_SetRenderDrawColor(renderer, healthColor.r, healthColor.g, healthColor.b, healthColor.a);
