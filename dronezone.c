@@ -90,17 +90,21 @@ void saveHighScore() {
     }
 }
 
-// Spawn random circles every 15 seconds
 void spawnCircles() {
     Uint32 currentTime = SDL_GetTicks();
 
-    if (currentTime - lastCircleSpawnTime > 10000) { // Every 15 seconds
+    if (currentTime - lastCircleSpawnTime > 10000) { // Every 10 seconds
         lastCircleSpawnTime = currentTime;
 
         int numNewCircles = rand() % 3 + 1; // 1 to 3 circles
 
+        // Ensure we don't exceed the max number of circles
+        if (numCircles + numNewCircles > MAX_CIRCLES) {
+            numNewCircles = MAX_CIRCLES - numCircles;  // Limit the number of circles to fit
+        }
+
         // Spawn new circles
-        for (int i = 0; i < numNewCircles && numCircles < MAX_CIRCLES; i++) {
+        for (int i = 0; i < numNewCircles; i++) {
             circles[numCircles].x = rand() % (WIDTH - 20) + 10;  // Random position
             circles[numCircles].y = rand() % (HEIGHT - 20) + 10;
             circles[numCircles].radius = 10;
@@ -108,10 +112,11 @@ void spawnCircles() {
             circles[numCircles].isVisible = 1;
             circles[numCircles].alpha = 0; // Start as invisible (fade in)
             circles[numCircles].lastAppearanceTime = currentTime;
-            numCircles++;
+            numCircles++; // Increment the circle count
         }
     }
 }
+
 
 // Draw a filled circle
 void SDL_RenderFillCircle(SDL_Renderer *renderer, int x, int y, int radius) {
@@ -356,7 +361,6 @@ void checkCollisions() {
     }
 }
 
-// Check for collisions with circles
 void checkCircleCollisions() {
     for (int i = 0; i < numCircles; i++) {
         if (circles[i].isVisible) {
@@ -365,6 +369,13 @@ void checkCircleCollisions() {
                 // Player passed over the circle
                 circles[i].isVisible = 0;  // Circle disappears
                 score += 10;  // Increase score
+
+                // Remove the circle by shifting remaining circles down
+                for (int j = i; j < numCircles - 1; j++) {
+                    circles[j] = circles[j + 1];  // Move each circle down one slot
+                }
+                numCircles--;  // Decrease the number of active circles
+                i--;  // Adjust index to avoid skipping a circle
             }
         }
     }
