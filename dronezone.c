@@ -61,10 +61,12 @@ TTF_Font *font = NULL;
 int running = 1;
 int inGame = 0;
 int inHelp = 0;
+int gameOver = 0;
 int playerHealth = 100;
 int score = 0;
 int highScore = 0;
 int numCircles = 0;
+int grayProgress = 0;
 
 // Menu Buttons
 Button playButton = {{WIDTH / 2 - 50, 200, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
@@ -351,6 +353,7 @@ void checkCollisions() {
         if (dist < 10) {
             playerHealth -= 1;
             if (playerHealth <= 0) {
+                gameOver = 1;
                 inGame = 0;
                 if (score > highScore) {
                     highScore = score;
@@ -454,6 +457,7 @@ void renderGame() {
     renderText(scoreText, WIDTH - 150, 10, (SDL_Color){255, 255, 255, 255});
 
     SDL_RenderPresent(renderer);
+    
 }
 
 
@@ -497,6 +501,61 @@ void renderHelp() {
     SDL_RenderPresent(renderer);
 }
 
+void renderGameOver() {
+    // Transition: slowly turn the background gray
+    static int grayProgress = 0;
+    if (grayProgress < 255) {
+        grayProgress += 1;  // Gradually turn to gray
+    }
+
+    SDL_SetRenderDrawColor(renderer, grayProgress, grayProgress, grayProgress, 255);
+    SDL_RenderClear(renderer); // Clear with the current gray value
+
+    // Render the game over screen
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);  // Black rectangle
+    SDL_Rect gameOverRect = {WIDTH / 2 - 150, HEIGHT / 2 - 100, 300, 200}; // Centered
+    SDL_RenderFillRect(renderer, &gameOverRect);
+
+    // Display current score and high score
+    char scoreText[100];
+    sprintf(scoreText, "Score: %d", score);
+    SDL_Color scoreColor = (score == highScore) ? (SDL_Color){255, 255, 0, 255} : (SDL_Color){255, 255, 255, 255};
+    renderText(scoreText, WIDTH / 2 - 100, HEIGHT / 2 - 50, scoreColor);
+
+    char highScoreText[100];
+    sprintf(highScoreText, "High Score: %d", highScore);
+    renderText(highScoreText, WIDTH / 2 - 100, HEIGHT / 2, (SDL_Color){255, 255, 255, 255});
+
+    // Retry button
+    renderButton(&backButton, "Retry");
+
+    SDL_RenderPresent(renderer);
+}
+
+
+void handleGameOverEvents(SDL_Event *e) {
+    int x, y;
+    SDL_GetMouseState(&x, &y);
+
+    // Retry button logic
+    backButton.hovered = (x >= backButton.rect.x && x <= backButton.rect.x + backButton.rect.w &&
+                           y >= backButton.rect.y && y <= backButton.rect.y + backButton.rect.h);
+
+    if (e->type == SDL_MOUSEBUTTONDOWN && backButton.hovered) {
+        backButton.clicked = 1;
+    } else if (e->type == SDL_MOUSEBUTTONUP && backButton.clicked) {
+        backButton.clicked = 0;
+        // Reset the game state
+        inGame = 1;
+        inHelp = 0;
+        gameOver = 0;
+        playerHealth = 100;
+        score = 0;
+        initDrones();
+        numCircles = 0;
+        grayProgress = 0;
+    }
+}
 
 // Modify handleMenuEvents
 void handleMenuEvents(SDL_Event *e) {
@@ -538,6 +597,11 @@ void handleMenuEvents(SDL_Event *e) {
             inHelp = 0;  // Go back to the main menu
         }
     }
+
+    // Handle events for game over screen retry button
+    if (!inGame && !inHelp) {
+        handleGameOverEvents(e);
+    }
 }
 
 // Main loop
@@ -566,14 +630,16 @@ int main() {
         SDL_GetMouseState(&mouseX, &mouseY);
 
         if (inHelp) {
-            renderHelp(); // Show help screen
+            renderHelp(); // Help screen
+        } else if (gameOver) {
+            renderGameOver(); // Game over screen
         } else if (!inGame) {
-            renderMenu(); // Show menu
-        } else {
+            renderMenu(); // Main menu
+        } else if (inGame) {
             updatePlayer(NULL, mouseX, mouseY);
             checkCollisions();
-            renderGame(); // Show game screen
-        }
+            renderGame(); // In-game rendering
+        }        
 
         // Calculate how long the frame took
         Uint32 frameTime = SDL_GetTicks() - frameStart;
