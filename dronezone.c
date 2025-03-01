@@ -9,6 +9,7 @@
 #define WIDTH 800
 #define HEIGHT 600
 #define MAX_SPEED 4
+#define MAX_PLANTS 100
 #define NUM_DRONES 50
 #define PLAYER_ACCEL 0.5f
 #define FRICTION 0.98f
@@ -49,11 +50,33 @@ typedef struct {
     Uint32 lastAppearanceTime; // For fade-in and fade-out effect
 } Circle;
 
+typedef struct {
+    float x, y;          // Position of the plant base
+    float growth;        // Growth stage (0.0 to 1.0)
+    float maxHeight;     // Maximum height it can reach
+    Uint32 spawnTime;    // When it was created
+    Uint32 lifespan;     // How long before it disappears
+    SDL_Color color;     // Green initially, turns brown later
+    int type;            // 0 = Grass, 1 = Vine, 2 = Fern
+    int alpha;
+    int isVisible;
+    int height;
+} Plant;
+
+typedef struct {
+    int x, y;
+    SDL_Color color;
+    int isBloomed;
+} Flower;
+
+
 Uint32 lastCircleSpawnTime = 0;
 
 Drone player;
 Drone drones[NUM_DRONES];
 Circle circles[MAX_CIRCLES];
+Plant plants[MAX_PLANTS];
+Flower flowers[MAX_CIRCLES];
 
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
@@ -67,6 +90,7 @@ int playerHealth = 100;
 int score = 0;
 int highScore = 0;
 int numCircles = 0;
+int numPlants = 0;
 int grayProgress = 0;
 
 // Define honey-colored palette
@@ -103,6 +127,146 @@ void saveHighScore() {
     }
 }
 
+void renderBackground() {
+    // Draw sky
+    SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255); // Pale blue
+    //SDL_RenderClear(renderer);
+    
+    // Draw sun
+    int sunX = WIDTH - 100, sunY = 80, sunRadius = 40;
+    filledCircleRGBA(renderer, sunX, sunY, sunRadius, 255, 223, 0, 55);
+    
+    // Draw sun rays (trapezoidal shape)
+    for (int angle = 0; angle < 360; angle += 30) {
+        int x1 = sunX + cos(angle * M_PI / 180) * (sunRadius + 10);
+        int y1 = sunY + sin(angle * M_PI / 180) * (sunRadius + 10);
+        int x2 = sunX + cos(angle * M_PI / 180) * (sunRadius + 30);
+        int y2 = sunY + sin(angle * M_PI / 180) * (sunRadius + 30);
+        thickLineRGBA(renderer, x1, y1, x2, y2, 6, 255, 200, 0, 55);
+    }
+
+    // Draw layered meadows
+    for (int i = 0; i < 1; i++) {
+        int meadowY = HEIGHT - (i * 20) - 30;
+        filledEllipseRGBA(renderer, WIDTH / 2 - 50, meadowY + 50, WIDTH / 2 + 80, 50, 34 + i * 10, 139 + i * 10, 34, 255);
+    }
+
+    // Random tiny flowers in meadows
+    int fx = rand() % WIDTH;
+    int fy = HEIGHT - (rand() % 120 + 30);
+    SDL_Color flowerColor = {rand() % 256, rand() % 256, rand() % 256, 55};
+    filledCircleRGBA(renderer, fx, fy, 2, flowerColor.r, flowerColor.g, flowerColor.b, 55);
+    
+}
+
+void spawnPlants() {
+    if (numPlants >= MAX_PLANTS) return; // Prevent overflow
+
+    int x = rand() % WIDTH;
+    int type = rand() % 3;  // Random type: Grass, Vine, or Fern
+
+    plants[numPlants].x = x;
+    plants[numPlants].y = HEIGHT;  // Always start at the bottom
+    plants[numPlants].growth = 0.0f;
+    plants[numPlants].maxHeight = (rand() % 40) + 30;  // 30 to 70 pixels
+    plants[numPlants].spawnTime = SDL_GetTicks();
+    plants[numPlants].lifespan = (rand() % 15000) + 10000; // 10 to 25 sec
+    plants[numPlants].color = (SDL_Color){34, 139, 34, 255}; // Green
+    plants[numPlants].type = type;
+
+    numPlants++;
+}
+
+
+void updatePlants() {
+    for (int i = 0; i < MAX_PLANTS; i++) {
+        if (!plants[i].isVisible) continue;
+        
+        Uint32 elapsed = SDL_GetTicks() - plants[i].spawnTime;
+        if (elapsed > 10000) { // Slowly disappear after 10s
+            plants[i].color.r = 139;
+            plants[i].color.g = 69;
+            plants[i].color.b = 19;
+            plants[i].alpha -= 5;
+            if (plants[i].alpha <= 0) {
+                plants[i].isVisible = 0;
+            }
+        }
+    }
+}
+
+void renderPlants() {
+    Uint32 currentTime = SDL_GetTicks();
+
+    for (int i = 0; i < numPlants; i++) {
+        float progress = (currentTime - plants[i].spawnTime) / (float)plants[i].lifespan;
+
+        // Change color to brown if it's near the end of lifespan
+        if (progress > 0.8f) {
+            plants[i].color.r = 139;
+            plants[i].color.g = 69;
+            plants[i].color.b = 19;
+        }
+
+        // Calculate growth height
+        float height = plants[i].growth * plants[i].maxHeight;
+        SDL_SetRenderDrawColor(renderer, plants[i].color.r, plants[i].color.g, plants[i].color.b, plants[i].color.a);
+
+        if (plants[i].type == 0) {
+            // Grass (short vertical lines)
+            SDL_RenderDrawLine(renderer, plants[i].x, HEIGHT, plants[i].x, HEIGHT - height);
+        } else if (plants[i].type == 1) {
+            // Vine (slightly curving line)
+            for (int y = 0; y < height; y += 4) {
+                SDL_RenderDrawPoint(renderer, plants[i].x + (rand() % 3 - 1), HEIGHT - y);
+            }
+        } else {
+            // Fern (small diagonal lines)
+            for (int y = 0; y < height; y += 5) {
+                SDL_RenderDrawLine(renderer, plants[i].x, HEIGHT - y, plants[i].x + (rand() % 8 - 4), HEIGHT - y - 3);
+            }
+        }
+
+        // Update growth
+        if (plants[i].growth < 1.0f) {
+            plants[i].growth += 0.01f;
+        }
+
+        // Remove expired plants
+        if (progress >= 1.0f) {
+            plants[i] = plants[numPlants - 1]; // Replace with last plant
+            numPlants--;
+            i--;
+        }
+    }
+}
+
+void spawnFlower(int x, int y) {
+    if (numCircles < MAX_CIRCLES) {
+        flowers[numCircles].x = x;
+        flowers[numCircles].y = y;
+        flowers[numCircles].color = (SDL_Color){rand() % 256, rand() % 256, rand() % 256, 255};
+        flowers[numCircles].isBloomed = 0;
+        numCircles++;
+    }
+}
+
+void updateFlowers() {
+    for (int i = 0; i < numCircles; i++) {
+        if (!flowers[i].isBloomed) {
+            // Simulate blooming logic
+            flowers[i].isBloomed = 1;
+        }
+    }
+}
+
+void renderFlowers(SDL_Renderer* renderer) {
+    for (int i = 0; i < numCircles; i++) {
+        filledCircleRGBA(renderer, flowers[i].x, flowers[i].y, 5, 
+                         flowers[i].color.r, flowers[i].color.g, flowers[i].color.b, 255);
+    }
+}
+
 void spawnCircles() {
     Uint32 currentTime = SDL_GetTicks();
 
@@ -111,21 +275,50 @@ void spawnCircles() {
 
         int numNewCircles = rand() % 3 + 1; // 1 to 3 circles
 
-        // Ensure we don't exceed the max number of circles
         if (numCircles + numNewCircles > MAX_CIRCLES) {
-            numNewCircles = MAX_CIRCLES - numCircles;  // Limit the number of circles to fit
+            numNewCircles = MAX_CIRCLES - numCircles;
         }
 
-        // Spawn new circles
         for (int i = 0; i < numNewCircles; i++) {
-            circles[numCircles].x = rand() % (WIDTH - 20) + 10;  // Random position
-            circles[numCircles].y = rand() % (HEIGHT - 20) + 10;
+            int x = rand() % (WIDTH - 20) + 10;
+            int y = rand() % (HEIGHT - 20) + 10;
+            
+            // Grow stem animation
+            for (int h = HEIGHT; h > y; h -= 5) {
+                SDL_SetRenderDrawColor(renderer, 34, 139, 34, 255);
+                SDL_RenderDrawLine(renderer, x, h, x, h - 5);
+                SDL_RenderPresent(renderer);
+                SDL_Delay(10);
+            }
+            
+            // Grow green bud
+            int budRadius = 2;
+            while (budRadius < 10) {
+                filledCircleRGBA(renderer, x, y, budRadius, 34, 139, 34, 255);
+                SDL_RenderPresent(renderer);
+                SDL_Delay(30);
+                budRadius++;
+            }
+            
+            // Blooming animation
+            SDL_Color petalColor = {rand() % 256, rand() % 256, rand() % 256, 255};
+            for (int p = 0; p < 360; p += 45) {
+                int petalX = x + cos(p * M_PI / 180) * 12;
+                int petalY = y + sin(p * M_PI / 180) * 12;
+                filledEllipseRGBA(renderer, petalX, petalY, rand() % 8 + 5, rand() % 6 + 4, petalColor.r, petalColor.g, petalColor.b, 255);
+                SDL_RenderPresent(renderer);
+                SDL_Delay(50);
+            }
+            
+            // Assign final bloom properties
+            circles[numCircles].x = x;
+            circles[numCircles].y = y;
             circles[numCircles].radius = 10;
-            circles[numCircles].color = (SDL_Color){0, 255, 255, 255};  // Cyan color
+            circles[numCircles].color = (SDL_Color){rand() % 100 + 100, rand() % 80 + 60, rand() % 60 + 40, 255}; // Earthy tones
             circles[numCircles].isVisible = 1;
-            circles[numCircles].alpha = 0; // Start as invisible (fade in)
+            circles[numCircles].alpha = 255;
             circles[numCircles].lastAppearanceTime = currentTime;
-            numCircles++; // Increment the circle count
+            numCircles++;
         }
     }
 }
@@ -444,6 +637,13 @@ void renderGame() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
+    renderBackground();
+
+    if (rand() % 100 < 3) {  // 3% chance every frame
+        spawnPlants();
+    }    
+    renderPlants();
+
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     // Rendering the opponent drones on-screen
     for (int i = 0; i < NUM_DRONES; i++) {
@@ -546,8 +746,8 @@ void renderHelp() {
 
     renderText("DRONE ZONE (c) Dewan Mukto, MuxAI 2025", WIDTH / 2 - 220, 50, (SDL_Color){255, 255, 255, 255});
     renderText("dewanmukto.mux8.com", WIDTH / 2 - 100, 100, (SDL_Color){255, 255, 255, 55});
-    renderText("Use your mouse for moving your drone.", WIDTH / 2 - 220, 150, (SDL_Color){255, 255, 255, 255});
-    renderText("Avoid crashing into other peoples' drones!", WIDTH / 2 - 220, 200, (SDL_Color){255, 255, 255, 255});
+    renderText("Use your mouse for moving your bee.", WIDTH / 2 - 220, 150, (SDL_Color){255, 255, 255, 255});
+    renderText("Avoid crashing into other bees!", WIDTH / 2 - 220, 200, (SDL_Color){255, 255, 255, 255});
 
     // Render the Back button
     renderButton(&backButton, "Back");
