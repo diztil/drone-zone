@@ -4,6 +4,7 @@
 #include <time.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
 
 #define WIDTH 800
 #define HEIGHT 600
@@ -67,6 +68,15 @@ int score = 0;
 int highScore = 0;
 int numCircles = 0;
 int grayProgress = 0;
+
+// Define honey-colored palette
+SDL_Color honeyPrimary = {255, 186, 77, 255};  // Warm golden
+SDL_Color honeySecondary = {230, 153, 51, 255}; // Darker honey
+SDL_Color honeyHighlight = {255, 204, 102, 255}; // Lighter honey
+SDL_Color honeyShadow = {200, 140, 0, 255};     // Darker brown
+SDL_Color beeStripe = {50, 30, 0, 255};        // Dark brown for stripes
+SDL_Color beeFace = {0, 0, 0, 255};            // Black for eyes/mouth
+
 
 // Menu Buttons
 Button playButton = {{WIDTH / 2 - 50, 200, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
@@ -134,6 +144,36 @@ void SDL_RenderFillCircle(SDL_Renderer *renderer, int x, int y, int radius) {
     }
 }
 
+// Function to draw a bee (player or drone)
+void drawBee(SDL_Renderer *renderer, float x, float y, float vx, float vy, int isPlayer) {
+    float angle = atan2(vy, vx);
+    SDL_SetRenderDrawColor(renderer, 255, 223, 0, 255); // Yellow bee body
+    filledCircleRGBA(renderer, (int)x, (int)y, 10, 255, 223, 0, 255);
+    
+    // Draw black stripes
+    for (int i = -8; i <= 8; i += 4) {
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderDrawLine(renderer, x - 7, y + i, x + 7, y + i);
+    }
+
+    // Draw larger wings
+    filledEllipseRGBA(renderer, (int)(x - 10), (int)(y - 5), 10, 5, 200, 200, 255, 180);
+    filledEllipseRGBA(renderer, (int)(x + 10), (int)(y - 5), 10, 5, 200, 200, 255, 180);
+    filledEllipseRGBA(renderer, (int)(x - cos(angle) * 8), (int)(y - sin(angle) * 5), 6, 3, honeyHighlight.r, honeyHighlight.g, honeyHighlight.b, 180);
+    filledEllipseRGBA(renderer, (int)(x + cos(angle) * 8), (int)(y - sin(angle) * 5), 6, 3, honeyHighlight.r, honeyHighlight.g, honeyHighlight.b, 180);
+    
+    // Draw antennae
+    SDL_RenderDrawLine(renderer, (int)x - 3, (int)y - 10, (int)x - 5, (int)y - 15);
+    SDL_RenderDrawLine(renderer, (int)x + 3, (int)y - 10, (int)x + 5, (int)y - 15);
+    
+    // Draw face only for the player
+    if (isPlayer) {
+        filledCircleRGBA(renderer, (int)x, (int)y, 10, honeyPrimary.r, honeyPrimary.g, honeyPrimary.b, 255);
+        filledCircleRGBA(renderer, (int)x - 3, (int)y - 2, 1, 0, 0, 0, 255); // Left eye
+        filledCircleRGBA(renderer, (int)x + 3, (int)y - 2, 1, 0, 0, 0, 255); // Right eye
+        SDL_RenderDrawLine(renderer, (int)x - 1, (int)y + 1, (int)x + 2, (int)y + 3); // Smile
+    }
+}
 
 // Initialize drones and circles
 void initDrones() {
@@ -318,6 +358,12 @@ void updateDrones() {
         if (drones[i].x >= WIDTH) drones[i].x = 0;
         if (drones[i].y < 0) drones[i].y = HEIGHT;
         if (drones[i].y >= HEIGHT) drones[i].y = 0;
+
+        if (drones[i].vx != 0 || drones[i].vy != 0) {
+            float angle = atan2(drones[i].vy, drones[i].vx);
+            drones[i].x += cos(angle) * 0.5; // Minor offset to align movement direction
+            drones[i].y += sin(angle) * 0.5;
+        }
     }
 }
 
@@ -345,6 +391,14 @@ void updatePlayer(const Uint8 *keystate, int mouseX, int mouseY) {
     // Update player position
     player.x += player.vx;
     player.y += player.vy;
+
+    // Ensure player faces movement direction
+    if (player.vx != 0 || player.vy != 0) {
+        float angle = atan2(player.vy, player.vx);
+        player.x += cos(angle) * 0.5; // Slight correction for rotation effect
+        player.y += sin(angle) * 0.5;
+    }
+
 }
 
 // Check for collisions
@@ -391,14 +445,13 @@ void renderGame() {
     SDL_RenderClear(renderer);
 
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    // Rendering the opponent drones on-screen
     for (int i = 0; i < NUM_DRONES; i++) {
-        SDL_Rect r = {(int)drones[i].x, (int)drones[i].y, 5, 5};
-        SDL_RenderFillRect(renderer, &r);
+        drawBee(renderer, (int)drones[i].x, (int)drones[i].y, (float)drones[i].vx, (float)drones[i].vy,0);
     }
 
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-    SDL_Rect p = {(int)player.x, (int)player.y, 8, 8};
-    SDL_RenderFillRect(renderer, &p);
+    // Rendering the player drone on-screen
+    drawBee(renderer,(int)player.x,(int)player.y,(float)player.vx,(float)player.vy,1);
 
     // Determine the health bar color based on the health value
     SDL_Color healthColor;
