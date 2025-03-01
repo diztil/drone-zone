@@ -72,6 +72,7 @@ int grayProgress = 0;
 Button playButton = {{WIDTH / 2 - 50, 200, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
 Button helpButton = {{WIDTH / 2 - 50, 250, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
 Button backButton = {{10, HEIGHT - 50, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
+Button menuButton = {{WIDTH - 110, HEIGHT - 50, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
 Button exitButton = {{WIDTH / 2 - 50, 300, 100, 40}, {255, 255, 255, 255}, {200, 200, 200, 255}, {100, 100, 100, 255}, 0, 0};
 
 // Load high score from file
@@ -511,7 +512,7 @@ void renderGameOver() {
     SDL_SetRenderDrawColor(renderer, grayProgress, grayProgress, grayProgress, 255);
     SDL_RenderClear(renderer); // Clear with the current gray value
 
-    // Render the game over screen
+    // Render the game over screen (black centered rectangle)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);  // Black rectangle
     SDL_Rect gameOverRect = {WIDTH / 2 - 150, HEIGHT / 2 - 100, 300, 200}; // Centered
     SDL_RenderFillRect(renderer, &gameOverRect);
@@ -526,8 +527,8 @@ void renderGameOver() {
     sprintf(highScoreText, "High Score: %d", highScore);
     renderText(highScoreText, WIDTH / 2 - 100, HEIGHT / 2, (SDL_Color){255, 255, 255, 255});
 
-    // Retry button
     renderButton(&backButton, "Retry");
+    renderButton(&menuButton, "Menu");
 
     SDL_RenderPresent(renderer);
 }
@@ -537,15 +538,19 @@ void handleGameOverEvents(SDL_Event *e) {
     int x, y;
     SDL_GetMouseState(&x, &y);
 
-    // Retry button logic
+    // Check the Retry button (backButton)
     backButton.hovered = (x >= backButton.rect.x && x <= backButton.rect.x + backButton.rect.w &&
-                           y >= backButton.rect.y && y <= backButton.rect.y + backButton.rect.h);
+                          y >= backButton.rect.y && y <= backButton.rect.y + backButton.rect.h);
+    
+    // Check the Menu button (menuButton)
+    menuButton.hovered = (x >= menuButton.rect.x && x <= menuButton.rect.x + menuButton.rect.w &&
+                          y >= menuButton.rect.y && y <= menuButton.rect.y + menuButton.rect.h);
 
     if (e->type == SDL_MOUSEBUTTONDOWN && backButton.hovered) {
         backButton.clicked = 1;
     } else if (e->type == SDL_MOUSEBUTTONUP && backButton.clicked) {
         backButton.clicked = 0;
-        // Reset the game state
+        // Retry: reset game state
         inGame = 1;
         inHelp = 0;
         gameOver = 0;
@@ -553,9 +558,24 @@ void handleGameOverEvents(SDL_Event *e) {
         score = 0;
         initDrones();
         numCircles = 0;
+        // Reset gray progress for a fresh transition next time
+        // (Either reinitialize grayProgress here or in initDrones())
+    }
+
+    if (e->type == SDL_MOUSEBUTTONDOWN && menuButton.hovered) {
+        menuButton.clicked = 1;
+    } else if (e->type == SDL_MOUSEBUTTONUP && menuButton.clicked) {
+        menuButton.clicked = 0;
+        // Menu: go back to main menu
+        inGame = 0;     // Set game state off so that the menu shows
+        gameOver = 0;   // Clear game over flag
+        // Optionally, reset other game state if needed:
+        initDrones();
+        numCircles = 0;
         grayProgress = 0;
     }
 }
+
 
 // Modify handleMenuEvents
 void handleMenuEvents(SDL_Event *e) {
