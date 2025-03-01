@@ -1,6 +1,11 @@
 # drone-zone 🐝
 Experimenting with game development using the dinosaur of programming languages, i.e. C.
 
+### Dependencies
+```bash
+sudo apt install build-essential libsdl2-dev libsdl2-ttf-dev libsdl2-gfx-dev libm-dev
+```
+
 ### Compilation
 ```bash
 gcc -o dronezone dronezone.c -lm $(sdl2-config --cflags --libs) $(pkg-config --cflags --libs SDL2_ttf SDL2_gfx)
@@ -28,4 +33,6 @@ gcc -o dronezone dronezone.c -lm $(sdl2-config --cflags --libs) $(pkg-config --c
 - [x] Multiple GUI screens
 - [x] File I/O for saving/retrieving high scores
 - [x] Boids algorithm for drone simulation
-- [x] Hardcoded bee models   
+- [x] Hardcoded bee models
+- [x] Hardcoded plants
+- [x] Hardcoded dynamic background
